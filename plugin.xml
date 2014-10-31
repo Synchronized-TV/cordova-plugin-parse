@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="tv.synchronized.cordova.parse" version="1.0.0">
+
+    <name>Parse</name>
+    <description>Cordova Parse.com swift plugin</description>
+    <license>MIT</license>
+
+    <engines>
+        <engine name="cordova" version="3.*" />
+    </engines>
+
+    <js-module src="www/Parse.js" name="Parse">
+        <clobbers target="cordova.plugins.Parse"/>
+    </js-module>
+
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="Parse">
+                <param name="ios-package" value="CDVParse" />
+                <param name="onload" value="true" />
+            </feature>
+        </config-file>
+
+        <header-file src="src/ios/Bridging-Header.h" />
+        <source-file src="src/ios/Parse.swift" />
+
+    </platform>
+</plugin>
