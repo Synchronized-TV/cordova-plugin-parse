@@ -2,34 +2,46 @@
 import Foundation
 import Parse
 
+@objc protocol SNSUtils {
+    class func unlinkUserInBackground(user: PFUser!, block: PFBooleanResultBlock!)
+    class func unlinkUserInBackground(user: PFUser!, target: AnyObject!, selector: Selector)
+}
+
 @objc(CDVParse) class CDVParse : CDVPlugin {
 
     // catches FB oauth
     override func handleOpenURL(notification: NSNotification!) {
+        super.handleOpenURL(notification);
         var sourceApplication = "test";
-        var wasHandled:Bool = FBAppCall.handleOpenURL(notification.object as NSURL, sourceApplication:nil);
-        NSLog("wasHandled %@", wasHandled);
+        var wasHandled:AnyObject = FBAppCall.handleOpenURL(notification.object as NSURL, sourceApplication:nil, withSession:PFFacebookUtils.session());
+        NSLog("wasHandled \(wasHandled)");
     }
-    
+
+    private func getPluginResult(success: Bool, message: String) -> CDVPluginResult {
+        NSLog("pluginResult(\(success)): \(message)");
+        return CDVPluginResult(status: (success ? CDVCommandStatus_OK : CDVCommandStatus_ERROR), messageAsString: message);
+    }
+
+    private func getPluginResult(success: Bool, message: String, data: Dictionary<String, AnyObject>) -> CDVPluginResult {
+        NSLog("pluginResult(\(success)): \(message)");
+        return CDVPluginResult(status: (success ? CDVCommandStatus_OK : CDVCommandStatus_ERROR), messageAsDictionary: data);
+    }
 
     func applicationDidBecomeActive(application: UIApplication) {
-      FBAppCall.handleDidBecomeActiveWithSession(PFFacebookUtils.session())
+        FBAppCall.handleDidBecomeActiveWithSession(PFFacebookUtils.session())
     }
 
     // dummy test
     func echo(command: CDVInvokedUrlCommand) {
         var message = command.arguments[0] as String
-        
         message = message.uppercaseString
-        
-        var pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsString: message)
+        var pluginResult = getPluginResult(true, message: message)
         commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
     }
-
+    
     // setup accounts on startup
     override func pluginInitialize() {
-        NSLog("pluginInitialize")
-        super.pluginInitialize()
+        NSLog("pluginInitialize");
 
         var plist = NSBundle.mainBundle();
 
@@ -44,124 +56,180 @@ import Parse
             consumerSecret: plist.objectForInfoDictionaryKey("TwitterConsumerSecret") as String
         )
 
-        PFUser.enableAutomaticUser()
-
-        var defaultACL = PFACL()
-
-        // If you would like all objects to be private by default, remove this line.
-        defaultACL.setPublicReadAccess(true)
-        PFACL.setDefaultACL(defaultACL, withAccessForCurrentUser: true)
+        var enableAutomaticUser: AnyObject! = plist.objectForInfoDictionaryKey("ParseEnableAutomaticUser");
+        if (enableAutomaticUser===true) {
+            PFUser.enableAutomaticUser();
+        }
 
     }
-
+    
     // return user status
-    func status(command: CDVInvokedUrlCommand) {
+    func getStatus(command: CDVInvokedUrlCommand) {
         var currentUser = PFUser.currentUser();
-
         var userStatus = [
-            "isNew": currentUser.isNew,
-            "isAuthenticated": currentUser.isAuthenticated(),
-            "facebook": PFFacebookUtils.isLinkedWithUser(currentUser),
-            "twitter": PFTwitterUtils.isLinkedWithUser(currentUser),
+            "isNew": true,
+            "isAuthenticated": false,
+            "facebook": false,
+            "twitter": false,
+            "fbId": "",
+            "fbName": "",
+            "fbEmail": "",
+            "twitterHandle": ""
         ];
-        NSLog("%@", currentUser);
-//        NSLog("%@", currentUser.email );
-        var pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsDictionary: userStatus)
+        if (currentUser != nil) {
+            userStatus = [
+                "isNew": currentUser.isNew,
+                "isAuthenticated": currentUser.isAuthenticated(),
+                "facebook": PFFacebookUtils.isLinkedWithUser(currentUser),
+                "twitter": PFTwitterUtils.isLinkedWithUser(currentUser),
+                "fbId": currentUser["fbId"] as String,
+                "fbName": currentUser["fbName"] as String,
+                "fbEmail": currentUser["fbEmail"] as String,
+                "twitterHandle": currentUser["twitterHandle"] as String
+            ];
+        }
+        var pluginResult = getPluginResult(true, message: "getStatus", data:userStatus)
         commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
     }
-
-    // start FB login process
-    func loginWithFacebook(command: CDVInvokedUrlCommand) {
-
-        var permissions = ["public_profile", "email"];
+    
+    func unlinkFacebook(command: CDVInvokedUrlCommand) {
+        var result = self.unlinkNetwork("facebook");
+        commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
+    }
+    
+    func unlinkTwitter(command: CDVInvokedUrlCommand) {
+        var result = self.unlinkNetwork("twitter");
+        commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
+    }
+    
+    private func getNetworkClass(network: String) -> AnyClass {
+        var networks: Dictionary<String, AnyClass> = [
+            "facebook": PFFacebookUtils.self,
+            "twitter": PFTwitterUtils.self
+        ];
+        return networks[network]!;
+    }
+    
+    private func unlinkNetwork(network: String) -> CDVPluginResult {
         var pluginResult = CDVPluginResult();
         var currentUser = PFUser.currentUser();
-        if (PFFacebookUtils.isLinkedWithUser(currentUser)) {
-            pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsString: "user already logged in with Facebook!");
-            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
-        } else {
-            NSLog("link FB account")
-            PFFacebookUtils.linkUser(currentUser, permissions:permissions, {
+        let networkCls: AnyClass = getNetworkClass(network);
+        if (networkCls.isLinkedWithUser(currentUser)) {
+            networkCls.unlinkUserInBackground(currentUser as PFUser!, {
                 (succeeded: Bool, error: NSError!) -> Void in
-                NSLog("link FB account result")
                 if succeeded {
-                    currentUser = PFUser.currentUser();
-                    NSLog("facebook OK %@", currentUser);
-                    NSLog("Woohoo, user logged in with Facebook!")
-
-                    
-                    FBRequestConnection.startForMeWithCompletionHandler({connection, result, error in
-                        if (error === nil)
-                        {
-                            NSLog("Fetched FB details")
-                            currentUser["fbId"] = result.objectID as String;
-                            currentUser["fbName"] = result.name as String;
-                            currentUser["fbEmail"] = result.email as String;
-                            currentUser.saveEventually()
-                            pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsString: "user logged in with Facebook!");
-                        }
-                        else
-                        {
-                            NSLog("Error fetching FB details")
-                            pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR, messageAsString: "Cannot fetch Facebook account details :/");
-                        }
-                    })
+                    pluginResult = self.getPluginResult(true, message: "The user is no longer associated with their \(network) account.");
                 } else {
-                    NSLog("Error linking Facebook account :/")
-                    pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR, messageAsString: "Error linking Facebook account :/");
+                    pluginResult = self.getPluginResult(false, message: "Cannot unlink user to their \(network) account.");
                 }
-                self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
             })
+        } else {
+            pluginResult = self.getPluginResult(false, message: "User not linked to \(network)");
         }
-
+        return pluginResult;
     }
 
+    private func loginWith(network: String, permissions: Array<String>=[]) -> CDVPluginResult {
+        // handle both FB and Twitter login processes
+        // handle existing and new account
+        var pluginResult = CDVPluginResult();
+        var currentUser = PFUser.currentUser();
+        let networkCls: AnyClass = getNetworkClass(network);
+        
+        // PFUser already exists
+        if (currentUser != nil) {
+            if (networkCls.isLinkedWithUser(currentUser)) {
+                pluginResult = self.getPluginResult(true, message: "user already logged in with \(network)!");
+            } else {
+                if (network == "facebook") {
+                    // facebook needs special permissions
+                    PFFacebookUtils.linkUser(currentUser, permissions: permissions as Array, {
+                        (succeeded: Bool, error: NSError!) -> Void in
+                        if succeeded {
+                            // fetch user details with FB api
+                            FBRequestConnection.startForMeWithCompletionHandler({connection, result, error in
+                                if (error === nil)
+                                {
+                                    currentUser["fbId"] = result.objectID as String;
+                                    currentUser["fbName"] = result.name as String;
+                                    currentUser["fbEmail"] = result.email as String;
+                                    currentUser.saveEventually()
+                                    pluginResult = self.getPluginResult(true, message: "user logged in with \(network)!");
+                                } else {
+                                    pluginResult = self.getPluginResult(false, message: "Cannot fetch \(network) account details :/");
+                                }
+                            })
+                        } else {
+                            pluginResult = self.getPluginResult(false, message: "Error linking \(network) account :/");
+                        }
+                    })
+                } else if (network == "twitter") {
+                    PFTwitterUtils.linkUser(currentUser, {
+                        (succeeded: Bool, error: NSError!) -> Void in
+                        if succeeded {
+                            // store twitter handle
+                            currentUser["twitterHandle"] = PFTwitterUtils.twitter().screenName;
+                            currentUser.saveEventually()
+                            pluginResult = self.getPluginResult(true, message: "user logged in with \(network)!");
+                        } else {
+                            pluginResult = self.getPluginResult(false, message: "Error linking \(network) account :/");
+                        }
+                    })
+                }
+           }
+            // user not logged, create a new account from FB
+        } else {
+            if (network == "facebook") {
+                // create a new user using FB
+                PFFacebookUtils.logInWithPermissions(permissions as Array, {
+                    (user: PFUser!, error: NSError!) -> Void in
+                    if user == nil {
+                        pluginResult = self.getPluginResult(false, message: "Uh oh. The user cancelled the \(network) login.");
+                    } else if user.isNew {
+                        pluginResult = self.getPluginResult(true, message: "User signed up and logged in through \(network)!");
+                    } else {
+                        pluginResult = self.getPluginResult(true, message: "User logged in through \(network)!");
+                    }
+                })
+            } else if (network == "twitter") {
+                // create a new user using twitter
+                PFTwitterUtils.logInWithBlock {
+                    (user: PFUser!, error: NSError!) -> Void in
+                    if user == nil {
+                        pluginResult = self.getPluginResult(false, message: "Uh oh. The user cancelled the \(network) login.");
+                    } else if user.isNew {
+                        pluginResult = self.getPluginResult(true, message: "User signed up and logged in through \(network)!");
+                    } else {
+                        pluginResult = self.getPluginResult(true, message: "User logged in through \(network)!");
+                    }
+                }
+            }
+        }
+        return pluginResult
+    }
+    
+    // start FB login process
+    func loginWithFacebook(command: CDVInvokedUrlCommand) {
+        var options = command.arguments[0] as [String: AnyObject];
+        if (options["permissions"] === nil) {
+            options["permissions"] = ["public_profile", "email"];
+        }
+        var result = self.loginWith("facebook", permissions: options["permissions"] as Array);
+        self.commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
+    }
+    
     // start Twitter login process
     func loginWithTwitter(command: CDVInvokedUrlCommand) {
-        var pluginResult = CDVPluginResult();
-        var currentUser = PFUser.currentUser()
-        if (PFTwitterUtils.isLinkedWithUser(currentUser)) {
-            pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsString: "user already logged in with Twitter!");
-            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
-        } else {
-            PFTwitterUtils.linkUser(currentUser, {
-                (succeeded: Bool, error: NSError!) -> Void in
-                if succeeded {
-                    currentUser = PFUser.currentUser();
-                    NSLog("twitter OK %@", currentUser);
-                    NSLog("Woohoo, user logged in with Twitter!")
-                    NSLog("%@", PFTwitterUtils.twitter());
-                    NSLog("%@", PFTwitterUtils.twitter().screenName);
-                    currentUser["twitterHandle"] = PFTwitterUtils.twitter().screenName;
-                    currentUser.saveEventually()
-                    pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsString: "user logged in with Twitter!");
-                } else {
-                    NSLog("Error linking Twitter account :/")
-                    pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR, messageAsString: "Error linking Twitter account :/");
-                }
-                self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
-            })
-        }
+        var result = self.loginWith("twitter");
+        self.commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
     }
 
     func logout(command: CDVInvokedUrlCommand) {
-        var pluginResult = CDVPluginResult();
-        pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAsString: "user logged out");
+        var pluginResult = self.getPluginResult(true, message: "user logged out");
         PFUser.logOut();
         self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
     }
-
-
+    
+    
 }
 
-func application(application: UIApplication,
-    openURL url: NSURL,
-    sourceApplication: String,
-    annotation: AnyObject?) -> Bool {
-        return FBAppCall.handleOpenURL(url, sourceApplication:sourceApplication,
-            withSession:PFFacebookUtils.session())
-}
-
-func applicationDidBecomeActive(application: UIApplication) {
-    FBAppCall.handleDidBecomeActiveWithSession(PFFacebookUtils.session())
-}
