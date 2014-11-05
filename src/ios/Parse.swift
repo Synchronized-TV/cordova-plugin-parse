@@ -56,7 +56,6 @@ import Parse
         var pluginResult = CDVPluginResult();
         
         var currentUser = PFUser.currentUser();
-        let userAdditionalProperties = ["fbId", "fbName", "fbEmail", "twitterHandle"];
         var userStatus = [
             "isNew": true,
             "isAuthenticated": false,
@@ -66,9 +65,6 @@ import Parse
             "email": "",
             "emailVerified": false
         ];
-        for item in userAdditionalProperties {
-            userStatus[item] = "";
-        }
         if (currentUser != nil) {
             // force refresh user data
             currentUser.fetchInBackgroundWithBlock {
@@ -84,10 +80,9 @@ import Parse
                     if (currentUser.objectForKey("emailVerified") != nil) {
                         userStatus["emailVerified"] = currentUser["emailVerified"] as Bool
                     }
-                    for item in userAdditionalProperties {
-                        if (currentUser.objectForKey(item) != nil) {
-                            userStatus[item] = currentUser[item] as String
-                        }
+                    for item in user.allKeys() {
+                        let key = item as String
+                        userStatus[key] = user[key] as? NSObject
                     }
                     pluginResult = self.getPluginResult(true, message: "getStatus", data:userStatus)
                 } else {
@@ -96,9 +91,7 @@ import Parse
                 }
                 self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
             }
-            
         }
-        
     }
 
     func unlinkFacebook(command: CDVInvokedUrlCommand) -> Void {

@@ -54,58 +54,57 @@ In "Build Settings" :
 
 ## Usage
 
-### `cordova.plugins.Parse.getStatus()`
+#### `cordova.plugins.Parse.getStatus()`
 
 retrieve user status (associations, stored informations...)
 
-```
+```js
 {
-    "twitter":true,
-    "fbId":"291401187735862",
-    "twitterHandle":"revolunet",
-    "isNew":false,
-    "fbName":"Julien Bouquillon",
-    "fbEmail":"julien@bouquillon.com",
-    "isAuthenticated":true,
-    "facebook":true}
+    "isNew": false
+    "twitter": true,
+    "facebook": true,
+    "isAuthenticated": true
 }
 ```
 
-### `cordova.plugins.Parse.signUp(email, password)`
+Additional user informations will be added to this object if any, eg : username, fbId, fbName, fbEmail, twitterHandle + custom data
+
+
+#### `cordova.plugins.Parse.signUp(email, password)`
 
 Create a new Parse account
 
-### `cordova.plugins.Parse.logIn(email, password)`
+#### `cordova.plugins.Parse.logIn(email, password)`
 
 Login a Parse account
 
-### `cordova.plugins.Parse.resetPassword(email)`
+#### `cordova.plugins.Parse.resetPassword(email)`
 
 Launch a password recovery process
 
-### `cordova.plugins.Parse.loginWithFacebook(options)`
+#### `cordova.plugins.Parse.loginWithFacebook(options)`
 
 FB login.
 
 default options = `{permissions: ["public_profile", "email"]}`
 
-### `cordova.plugins.Parse.loginWithTwitter()`
+#### `cordova.plugins.Parse.loginWithTwitter()`
 
 Twitter login
 
-### `cordova.plugins.Parse.unlinkFacebook()`
+#### `cordova.plugins.Parse.unlinkFacebook()`
 
 de-associate from FB
 
-### `cordova.plugins.Parse.unlinkTwitter()`
+#### `cordova.plugins.Parse.unlinkTwitter()`
 
 de-associate from twitter
 
-### `cordova.plugins.Parse.logout()`
+#### `cordova.plugins.Parse.logout()`
 
 logout Parse user
 
-### `cordova.plugins.Parse.setUserKey(key, value)`
+#### `cordova.plugins.Parse.setUserKey(key, value)`
 
 Saves data in the given key (string only at the moment)
 
