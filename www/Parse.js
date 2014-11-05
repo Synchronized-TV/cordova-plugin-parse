@@ -3,10 +3,6 @@ var exec = require("cordova/exec");
 
 var Parse = function(){};
 
-Parse.prototype.echo = function (message, successCallback, errorCallback) {
-    cordova.exec(successCallback, errorCallback, "Parse", "echo", [message]);
-};
-
 Parse.prototype.getStatus = function (successCallback, errorCallback) {
     cordova.exec(successCallback, errorCallback, "Parse", "getStatus", []);
 };
@@ -19,6 +15,18 @@ Parse.prototype.loginWithTwitter = function (successCallback, errorCallback) {
     cordova.exec(successCallback, errorCallback, "Parse", "loginWithTwitter", []);
 };
 
+Parse.prototype.logIn = function (email, password, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "logIn", [email, password]);
+};
+
+Parse.prototype.signUp = function (email, password, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "signUp", [email, password]);
+};
+
+Parse.prototype.resetPassword = function (email, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "resetPassword", [email]);
+};
+
 Parse.prototype.logout = function (successCallback, errorCallback) {
     cordova.exec(successCallback, errorCallback, "Parse", "logout", []);
 };
@@ -29,6 +37,10 @@ Parse.prototype.unlinkFacebook = function (successCallback, errorCallback) {
 
 Parse.prototype.unlinkTwitter = function (successCallback, errorCallback) {
     cordova.exec(successCallback, errorCallback, "Parse", "unlinkTwitter", []);
+};
+
+Parse.prototype.setUserKey = function(key, value, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "setUserKey", [key, value]);
 };
 
 

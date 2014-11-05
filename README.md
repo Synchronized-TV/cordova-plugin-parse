@@ -71,8 +71,19 @@ retrieve user status (associations, stored informations...)
 }
 ```
 
+### `cordova.plugins.Parse.signUp(email, password)`
 
-### `cordova.plugins.Parse.loginWithFacebook([options])`
+Create a new Parse account
+
+### `cordova.plugins.Parse.logIn(email, password)`
+
+Login a Parse account
+
+### `cordova.plugins.Parse.resetPassword(email)`
+
+Launch a password recovery process
+
+### `cordova.plugins.Parse.loginWithFacebook(options)`
 
 FB login.
 
@@ -93,6 +104,10 @@ de-associate from twitter
 ### `cordova.plugins.Parse.logout()`
 
 logout Parse user
+
+### `cordova.plugins.Parse.setUserKey(key, value)`
+
+Saves data in the given key (string only at the moment)
 
 ## Troubleshooting
 

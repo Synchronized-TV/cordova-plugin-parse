@@ -27,18 +27,6 @@ import Parse
         return CDVPluginResult(status: (success ? CDVCommandStatus_OK : CDVCommandStatus_ERROR), messageAsDictionary: data);
     }
 
-    func applicationDidBecomeActive(application: UIApplication) {
-        FBAppCall.handleDidBecomeActiveWithSession(PFFacebookUtils.session())
-    }
-
-    // dummy test
-    func echo(command: CDVInvokedUrlCommand) {
-        var message = command.arguments[0] as String
-        message = message.uppercaseString
-        var pluginResult = getPluginResult(true, message: message)
-        commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
-    }
-    
     // setup accounts on startup
     override func pluginInitialize() {
         NSLog("pluginInitialize");
@@ -60,48 +48,69 @@ import Parse
         if (enableAutomaticUser===true) {
             PFUser.enableAutomaticUser();
         }
-
     }
-    
+
     // return user status
-    func getStatus(command: CDVInvokedUrlCommand) {
+    func getStatus(command: CDVInvokedUrlCommand) -> Void {
+        
+        var pluginResult = CDVPluginResult();
+        
         var currentUser = PFUser.currentUser();
+        let userAdditionalProperties = ["fbId", "fbName", "fbEmail", "twitterHandle"];
         var userStatus = [
             "isNew": true,
             "isAuthenticated": false,
             "facebook": false,
             "twitter": false,
-            "fbId": "",
-            "fbName": "",
-            "fbEmail": "",
-            "twitterHandle": ""
+            "username": "",
+            "email": "",
+            "emailVerified": false
         ];
-        if (currentUser != nil) {
-            userStatus = [
-                "isNew": currentUser.isNew,
-                "isAuthenticated": currentUser.isAuthenticated(),
-                "facebook": PFFacebookUtils.isLinkedWithUser(currentUser),
-                "twitter": PFTwitterUtils.isLinkedWithUser(currentUser),
-                "fbId": currentUser["fbId"] as String,
-                "fbName": currentUser["fbName"] as String,
-                "fbEmail": currentUser["fbEmail"] as String,
-                "twitterHandle": currentUser["twitterHandle"] as String
-            ];
+        for item in userAdditionalProperties {
+            userStatus[item] = "";
         }
-        var pluginResult = getPluginResult(true, message: "getStatus", data:userStatus)
-        commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+        if (currentUser != nil) {
+            // force refresh user data
+            currentUser.fetchInBackgroundWithBlock {
+                (user:PFObject!, error: NSError!) -> Void in
+                if (error == nil) {
+                    // update with logged in user data
+                    userStatus["isNew"] = currentUser.isNew
+                    userStatus["username"] = currentUser.username
+                    userStatus["email"] = currentUser.email
+                    userStatus["isAuthenticated"] = currentUser.isAuthenticated()
+                    userStatus["facebook"] = PFFacebookUtils.isLinkedWithUser(currentUser)
+                    userStatus["twitter"] = PFTwitterUtils.isLinkedWithUser(currentUser)
+                    if (currentUser.objectForKey("emailVerified") != nil) {
+                        userStatus["emailVerified"] = currentUser["emailVerified"] as Bool
+                    }
+                    for item in userAdditionalProperties {
+                        if (currentUser.objectForKey(item) != nil) {
+                            userStatus[item] = currentUser[item] as String
+                        }
+                    }
+                    pluginResult = self.getPluginResult(true, message: "getStatus", data:userStatus)
+                } else {
+                    let errorString = error.userInfo!["error"] as NSString
+                    pluginResult = self.getPluginResult(false, message: errorString)
+                }
+                self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+            }
+            
+        }
+        
     }
-    
-    func unlinkFacebook(command: CDVInvokedUrlCommand) {
+
+    func unlinkFacebook(command: CDVInvokedUrlCommand) -> Void {
         var result = self.unlinkNetwork("facebook");
         commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
     }
-    
-    func unlinkTwitter(command: CDVInvokedUrlCommand) {
+
+    func unlinkTwitter(command: CDVInvokedUrlCommand) -> Void {
         var result = self.unlinkNetwork("twitter");
         commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
     }
-    
+
     private func getNetworkClass(network: String) -> AnyClass {
         var networks: Dictionary<String, AnyClass> = [
             "facebook": PFFacebookUtils.self,
@@ -109,7 +118,7 @@ import Parse
         ];
         return networks[network]!;
     }
-    
+
     private func unlinkNetwork(network: String) -> CDVPluginResult {
         var pluginResult = CDVPluginResult();
         var currentUser = PFUser.currentUser();
@@ -207,9 +216,9 @@ import Parse
         }
         return pluginResult
     }
-    
+
     // start FB login process
-    func loginWithFacebook(command: CDVInvokedUrlCommand) {
+    func loginWithFacebook(command: CDVInvokedUrlCommand) -> Void {
         var options = command.arguments[0] as [String: AnyObject];
         if (options["permissions"] === nil) {
             options["permissions"] = ["public_profile", "email"];
@@ -217,19 +226,86 @@ import Parse
         var result = self.loginWith("facebook", permissions: options["permissions"] as Array);
         self.commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
     }
-    
+
     // start Twitter login process
-    func loginWithTwitter(command: CDVInvokedUrlCommand) {
+    func loginWithTwitter(command: CDVInvokedUrlCommand) -> Void {
         var result = self.loginWith("twitter");
         self.commandDelegate.sendPluginResult(result, callbackId:command.callbackId)
     }
 
-    func logout(command: CDVInvokedUrlCommand) {
+    func logout(command: CDVInvokedUrlCommand) -> Void {
         var pluginResult = self.getPluginResult(true, message: "user logged out");
         PFUser.logOut();
         self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
     }
-    
-    
+
+    // create a new Parse account
+    func signUp(command: CDVInvokedUrlCommand) -> Void {
+        var email = command.arguments[0] as String
+        var password = command.arguments[1] as String
+        var pluginResult = CDVPluginResult()
+
+        var user = PFUser()
+        user.username = email
+        user.password = password
+        user.email = email
+
+        user.signUpInBackgroundWithBlock {
+            (succeeded: Bool!, error: NSError!) -> Void in
+            if error == nil {
+                pluginResult = self.getPluginResult(true, message: "user signed up successfully");
+            } else {
+                let errorString = error.userInfo!["error"] as NSString
+                pluginResult = self.getPluginResult(false, message: errorString);
+            }
+            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+        }
+    }
+
+    // login to a new Parse account
+    func logIn(command: CDVInvokedUrlCommand) -> Void {
+        var email = command.arguments[0] as String
+        var password = command.arguments[1] as String
+        var pluginResult = CDVPluginResult()
+
+        PFUser.logInWithUsernameInBackground(email, password:password) {
+            (user: PFUser!, error: NSError!) -> Void in
+            if user != nil {
+                pluginResult = self.getPluginResult(true, message: "user logged in successfully");
+            } else {
+                let errorString = error.userInfo!["error"] as NSString
+                pluginResult = self.getPluginResult(false, message: errorString);
+            }
+            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+        }
+    }
+
+    // launch Parse password receovery process
+    func resetPassword(command: CDVInvokedUrlCommand) -> Void {
+        var email = command.arguments[0] as String
+        var pluginResult = CDVPluginResult()
+
+        PFUser.requestPasswordResetForEmailInBackground(email) {
+            (succeeded: Bool!, error: NSError!) -> Void in
+            if error == nil {
+                pluginResult = self.getPluginResult(true, message: "password reset email sent");
+            } else {
+                let errorString = error.userInfo!["error"] as NSString
+                pluginResult = self.getPluginResult(false, message: errorString);
+            }
+            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+        }
+    }
+
+    func setUserKey(command: CDVInvokedUrlCommand) -> Void {
+        var key = command.arguments[0] as String
+        var value = command.arguments[1] as String
+        var currentUser = PFUser.currentUser()
+        currentUser[key] = value
+        currentUser.saveEventually();
+        var pluginResult = self.getPluginResult(true, message: "user updated successfully");
+        self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+    }
+
 }
 
