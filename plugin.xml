@@ -24,6 +24,8 @@
         <header-file src="src/ios/Bridging-Header.h" />
         <source-file src="src/ios/Parse.swift" />
 
+        <framework src="Accounts.framework"/>
+        <framework src="Social.framework"/>
         <framework src="libs/ios/FacebookSDK.framework" custom="true" />
         <framework src="libs/ios/Parse.framework" custom="true" />
         <framework src="libs/ios/ParseFacebookUtils.framework" custom="true" />

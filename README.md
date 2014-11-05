@@ -5,6 +5,10 @@ Using swift language and iOS>=7.0 only at the moment.
 
 ## Installation 
 
+Install the plugin :
+
+`cordova plugin add https://github.com/Synchronized-TV/tv.synchronized.cordova.parse.git`
+
 Add to your `*.plist` and edit values :
 
 ```xml
@@ -92,5 +96,6 @@ logout Parse user
 
 ## Troubleshooting
 
- - Make sure `Parse.swift` is included in your Build phases/Compile sources section
+ - Make sure `Parse.swift` is included in your "Build phases/Compile sources" section
+ - Make sure the frameworks are included in your "Build phases/Link binaries" section
  - Error on `pluginInitialize` : ensure you added the custom plist entries
