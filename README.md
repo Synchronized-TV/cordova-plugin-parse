@@ -67,7 +67,11 @@ retrieve user status (associations, stored informations...)
 }
 ```
 
-Additional user informations will be added to this object if any, eg : username, fbId, fbName, fbEmail, twitterHandle + custom data
+Additional user informations will be added to this object for authenticated users :
+ - sessionToken
+ - applications keys needed for the client side (extracted from the project plist file)
+ - some basic social networks data if any (name, email...)
+ - custom user values added via `setUserKey()`
 
 
 #### `cordova.plugins.Parse.signUp(email, password)`
@@ -107,6 +111,16 @@ logout Parse user
 #### `cordova.plugins.Parse.setUserKey(key, value)`
 
 Saves data in the given key (string only at the moment)
+
+## Twitter
+
+#### `cordova.plugins.Parse.twitter.retweet(tweetId)`
+
+Retweet a given tweet
+
+#### `cordova.plugins.Parse.twitter.favorite(tweetId)`
+
+Favorite a given tweet
 
 ## Troubleshooting
 

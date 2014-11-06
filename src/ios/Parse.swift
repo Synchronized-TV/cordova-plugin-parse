@@ -27,35 +27,42 @@ import Parse
         return CDVPluginResult(status: (success ? CDVCommandStatus_OK : CDVCommandStatus_ERROR), messageAsDictionary: data);
     }
 
+    // store keys for the client
+    var appKeys = [String: String]();
+
     // setup accounts on startup
     override func pluginInitialize() {
         NSLog("pluginInitialize");
 
         var plist = NSBundle.mainBundle();
-
+        // store some keys for the client SDKs
+        appKeys["ParseApplicationId"] = plist.objectForInfoDictionaryKey("ParseApplicationId") as String!
+        appKeys["ParseClientKey"] = plist.objectForInfoDictionaryKey("ParseClientKey") as String!
+        // not needed (yet) because twitter not included in the Parse client SDK
+        // appKeys["TwitterConsumerKey"] = plist.objectForInfoDictionaryKey("TwitterConsumerKey") as? String
+        appKeys["FacebookAppID"] = plist.objectForInfoDictionaryKey("FacebookAppID") as String!
         Parse.setApplicationId(
-            plist.objectForInfoDictionaryKey("ParseApplicationId") as String,
-            clientKey: plist.objectForInfoDictionaryKey("ParseClientKey") as String
+            appKeys["ParseApplicationId"],
+            clientKey: appKeys["ParseClientKey"]
         )
         PFFacebookUtils.initializeFacebook()
-
         PFTwitterUtils.initializeWithConsumerKey(
-            plist.objectForInfoDictionaryKey("TwitterConsumerKey") as String,
-            consumerSecret: plist.objectForInfoDictionaryKey("TwitterConsumerSecret") as String
+            plist.objectForInfoDictionaryKey("TwitterConsumerKey") as String!,
+            consumerSecret: plist.objectForInfoDictionaryKey("TwitterConsumerSecret") as String!
         )
 
-        var enableAutomaticUser: AnyObject! = plist.objectForInfoDictionaryKey("ParseEnableAutomaticUser");
-        if (enableAutomaticUser===true) {
+        let enableAutomaticUser: AnyObject! = plist.objectForInfoDictionaryKey("ParseEnableAutomaticUser");
+        if enableAutomaticUser===true {
             PFUser.enableAutomaticUser();
         }
     }
 
     // return user status
     func getStatus(command: CDVInvokedUrlCommand) -> Void {
-        
-        var pluginResult = CDVPluginResult();
-        
-        var currentUser = PFUser.currentUser();
+
+        var pluginResult = CDVPluginResult()
+        var currentUser = PFUser.currentUser()
+
         var userStatus = [
             "isNew": true,
             "isAuthenticated": false,
@@ -65,18 +72,21 @@ import Parse
             "email": "",
             "emailVerified": false
         ];
+
         if (currentUser != nil) {
             // force refresh user data
             currentUser.fetchInBackgroundWithBlock {
                 (user:PFObject!, error: NSError!) -> Void in
                 if (error == nil) {
                     // update with logged in user data
+                    userStatus["sessionToken"] = currentUser.sessionToken
                     userStatus["isNew"] = currentUser.isNew
                     userStatus["username"] = currentUser.username
                     userStatus["email"] = currentUser.email
                     userStatus["isAuthenticated"] = currentUser.isAuthenticated()
                     userStatus["facebook"] = PFFacebookUtils.isLinkedWithUser(currentUser)
                     userStatus["twitter"] = PFTwitterUtils.isLinkedWithUser(currentUser)
+                    userStatus["keys"] = self.appKeys
                     if (currentUser.objectForKey("emailVerified") != nil) {
                         userStatus["emailVerified"] = currentUser["emailVerified"] as Bool
                     }
@@ -137,7 +147,7 @@ import Parse
         var pluginResult = CDVPluginResult();
         var currentUser = PFUser.currentUser();
         let networkCls: AnyClass = getNetworkClass(network);
-        
+
         // PFUser already exists
         if (currentUser != nil) {
             if (networkCls.isLinkedWithUser(currentUser)) {
@@ -178,7 +188,7 @@ import Parse
                         }
                     })
                 }
-           }
+            }
             // user not logged, create a new account from FB
         } else {
             if (network == "facebook") {
@@ -300,5 +310,71 @@ import Parse
         self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
     }
 
+    // create a decente Twitter API call
+    private func getTwitterRequest(url: String, method: String = "POST", bodyData: String = "") -> NSMutableURLRequest {
+        let request = NSMutableURLRequest(URL: NSURL(string: url)!)
+        request.HTTPMethod = method
+        if bodyData != "" {
+            request.HTTPBody = bodyData.dataUsingEncoding(NSUTF8StringEncoding);
+        }
+        PFTwitterUtils.twitter().signRequest(request)
+        return request
+    }
+
+    // parse errors if any
+    private func handleTwitterResponse(data: NSData) -> CDVPluginResult {
+        var pluginResult = CDVPluginResult()
+        var jsonResult: NSDictionary = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: nil) as NSDictionary
+        if let errors = jsonResult["errors"]? as? NSArray {
+            if errors.count > 0 {
+                pluginResult = self.getPluginResult(false, message: errors[0]["message"] as String);
+            } else {
+                pluginResult = self.getPluginResult(true, message: "success");
+            }
+        } else {
+            pluginResult = self.getPluginResult(true, message: "success");
+        }
+        return pluginResult
+    }
+
+    // create/destroy retweet
+    private func twitterRetweetStatus(command: CDVInvokedUrlCommand, enable: Bool) -> Void {
+        let tweetId = command.arguments[0] as String
+        let action: String = enable ? "retweet" : "destroy";
+        let url = "https://api.twitter.com/1.1/statuses/\(action)/\(tweetId).json"
+        var request = self.getTwitterRequest(url, method: "POST")
+        NSURLConnection.sendAsynchronousRequest(request, queue: NSOperationQueue.mainQueue()) {(response, data, error) in
+            let pluginResult: CDVPluginResult = self.handleTwitterResponse(data);
+            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+        }
+    }
+
+    func twitterRetweet(command: CDVInvokedUrlCommand) -> Void {
+        self.twitterRetweetStatus(command, enable: true);
+    }
+
+    func twitterCancelRetweet(command: CDVInvokedUrlCommand) -> Void {
+        self.twitterRetweetStatus(command, enable: false);
+    }
+
+    // create/destroy favorite
+    private func twitterFavoriteStatus(command: CDVInvokedUrlCommand, enable: Bool) -> Void {
+        let tweetId = command.arguments[0] as String
+        let action: String = enable ? "create" : "destroy";
+        let url = "https://api.twitter.com/1.1/favorites/\(action).json"
+        var request = self.getTwitterRequest(url, method: "POST", bodyData: "id=\(tweetId)")
+        NSURLConnection.sendAsynchronousRequest(request, queue: NSOperationQueue.mainQueue()) {(response, data, error) in
+            let pluginResult: CDVPluginResult = self.handleTwitterResponse(data);
+            self.commandDelegate.sendPluginResult(pluginResult, callbackId:command.callbackId)
+        }
+    }
+
+    func twitterFavorite(command: CDVInvokedUrlCommand) -> Void {
+        self.twitterFavoriteStatus(command, enable: true);
+    }
+
+    func twitterCancelFavorite(command: CDVInvokedUrlCommand) -> Void {
+        self.twitterFavoriteStatus(command, enable: false);
+    }
 }
 

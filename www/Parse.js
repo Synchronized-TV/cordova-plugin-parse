@@ -1,7 +1,7 @@
-
 var exec = require("cordova/exec");
 
 var Parse = function(){};
+
 
 Parse.prototype.getStatus = function (successCallback, errorCallback) {
     cordova.exec(successCallback, errorCallback, "Parse", "getStatus", []);
@@ -43,5 +43,22 @@ Parse.prototype.setUserKey = function(key, value, successCallback, errorCallback
     cordova.exec(successCallback, errorCallback, "Parse", "setUserKey", [key, value]);
 };
 
+Parse.prototype.twitter = {};
+
+Parse.prototype.twitter.retweet = function(tweetId, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "twitterRetweet", [tweetId]);
+};
+
+Parse.prototype.twitter.cancelRetweet = function(tweetId, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "twitterCancelRetweet", [tweetId]);
+};
+
+Parse.prototype.twitter.favorite = function(tweetId, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "twitterFavorite", [tweetId]);
+};
+
+Parse.prototype.twitter.cancelFavorite = function(tweetId, successCallback, errorCallback) {
+    cordova.exec(successCallback, errorCallback, "Parse", "twitterCancelFavorite", [tweetId]);
+};
 
 module.exports = new Parse();
