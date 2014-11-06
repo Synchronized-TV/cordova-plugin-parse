@@ -37,10 +37,11 @@ import Parse
         var plist = NSBundle.mainBundle();
         // store some keys for the client SDKs
         appKeys["ParseApplicationId"] = plist.objectForInfoDictionaryKey("ParseApplicationId") as String!
-        appKeys["ParseClientKey"] = plist.objectForInfoDictionaryKey("ParseClientKey") as String!
+        //appKeys["ParseClientKey"] = plist.objectForInfoDictionaryKey("ParseClientKey") as String!
         // not needed (yet) because twitter not included in the Parse client SDK
         // appKeys["TwitterConsumerKey"] = plist.objectForInfoDictionaryKey("TwitterConsumerKey") as? String
         appKeys["FacebookAppID"] = plist.objectForInfoDictionaryKey("FacebookAppID") as String!
+
         Parse.setApplicationId(
             appKeys["ParseApplicationId"],
             clientKey: appKeys["ParseClientKey"]
