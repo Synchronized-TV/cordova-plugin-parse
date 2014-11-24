@@ -4,11 +4,11 @@ Using swift language and iOS>=7.0 only at the moment.
 
 Provides basic native functionnalities (login, signup...) and returns the sessionToken so you can also use the plain Parse javascript SDK if needed.
 
-## Installation 
+## Installation
 
 Install the plugin :
 
-`cordova plugin add https://github.com/Synchronized-TV/tv.synchronized.cordova.parse.git`
+`cordova plugin add https://github.com/Synchronized-TV/synchronized.cordova.parse.git`
 
 Add to your `*.plist` and edit values :
 
@@ -38,7 +38,7 @@ Add to your `*.plist` and edit values :
 </array>
 ```
 
-Add this to your app delegate : 
+Add this to your app delegate :
 
 ```c
 #import <ParseFacebookUtils/PFFacebookUtils.h>
@@ -50,7 +50,7 @@ Add this to your app delegate :
 
 In "Build Settings" :
 
- - add this to "Objective-C Bridging header" : `$(PROJECT_NAME)/Plugins/tv.synchronized.cordova.parse/Bridging-Header.h`
+ - add this to "Objective-C Bridging header" : `$(PROJECT_NAME)/Plugins/synchronized.cordova.parse/Bridging-Header.h`
  - add this to "Runpath search paths" : `$(inherited) @executable_path/Frameworks`
 
 ## Usage
@@ -132,41 +132,6 @@ Favorite a given tweet
 
 Cancel a given favorite
 
-## Optional : Parse Javascript SDK
-
-This plugin adds the missing native experience like the login/signup via the social networks.
-
-If you need more functionnalities, you can also link your Parse.com javascript SDK : get the `sessionToken` from the plugin `getStatus()` method then use the standard Parse API to login the user in the webview using `Parse.User.become(sessionToken)`. eg:
-
-```js
-// get native sessionToken and use it with the webview SDK
-cordova.plugins.Parse.getStatus(function(result) {
-    // initialize Parse
-    console.log(result);
-    /* ApplicationId, javaScriptKey */
-    Parse.initialize(result.keys.ParseApplicationId, javaScriptKey);
-    // initialize parse user
-    if (result.sessionToken) {
-        Parse.User.become(result.sessionToken).then(function() {
-            console.log('become success', arguments);
-            console.log('Parse JS user', Parse.User.current());
-        }, function() {
-            console.log('become error', arguments);
-        })
-    }
-    // initialize fb user, DOESNT WORK FOR SOME REASON !
-    Parse.FacebookUtils.init({
-          appId      : result.keys.FacebookAppID,
-          xfbml      : true,
-          version    : 'v2.1'
-        });
-      };
-}, function(message) {
-    alert('something went wrong : ' + message)
-});
-
-
-```
 
 ## Troubleshooting
 
