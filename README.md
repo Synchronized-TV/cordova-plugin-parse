@@ -138,3 +138,7 @@ Cancel a given favorite
  - Make sure `Parse.swift` is included in your "Build phases/Compile sources" section
  - Make sure the frameworks are included in your "Build phases/Link binaries" section
  - Error on `pluginInitialize` : ensure you added the custom plist entries
+
+## Licence MIT
+
+Code distributed under MIT licence. Contributions welcome.
